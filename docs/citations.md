@@ -1,7 +1,5 @@
 # Citations
 
-From concept to actual tools and insights, much have gone into creating these platforms and I hope you will cite them as needed.
-
 To cite Google Earth Engine, use the following:
 
 ```

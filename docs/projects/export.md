@@ -1,74 +1,65 @@
-# Export Images in Earth Engine
+# Exporting Image & Visualization
 
-When we are all said and done we still want to export the images. Google Earth Engine allows you to export images externally into two subsystems, a Google Cloud Storage Bucket(Free quota upto 5 GB) or Google Drive (This is tied to your overall quota). The method we are exploring right now is export to Google Drive, and then being able to import the analyzed image into any local tool or libraries. It is possible to export entire collections to drive using batch exports in the python API client. This avoids the need for you to click on the Run button everytime an export task has to be started.
+When we are all said and done we still want to export the images. Google Earth Engine allows you to export images externally into two subsystems, a Google Cloud Storage Bucket or Google Drive. The method we are exploring right now is export to Google Drive, and then being able to import the analyzed image into any local tool or libraries. It is possible to export entire collections to drive using batch exports in the python API client. This avoids the need for you to click on the Run button every time an export task has to be started.
 
-<center>![export](/images/ee_export.JPG)</center>
-<center>**Export Window: Export Image to Google Drive**</center>
+For this setup we are going to export the Sentinel-2 mosaic imagery at a 20m resolution
 
-For this setup we look at how we added Landsat 5 Surface Reflectance data earlier , filtering it using WRS Path and Row and further using Cloud cover for the scene. The next step we are building an function to calculate yearly composites from 1984 to 2010 using the Landsat 5 data. Note that this is another way of creating a function where we have inserted the map function and the collection inside the function so it can be run directly. We might be interested in sorting these collections using year and hence we set the year as a metadata for each image in the cloud free composite. Depending on the type of imagery another good way of creating cloud free composites is by using the pixel qa bit bands in the Landsat surface reflectance imagery. The last step that is added is the Export to drive function, where we set up the image name, the image type, the scale and the region refers to areas over which we are exporting this imagery.
+![ee_exporting](https://user-images.githubusercontent.com/6677629/118347255-54f9fd00-b507-11eb-9236-18d7ff0fcd73.gif)
+
 
 ``` js
+var s2 = ee.ImageCollection("COPERNICUS/S2_SR");
+var geometry =
+    ee.Geometry.Polygon(
+        [[[-89.79297430041262, 29.677212347812258],
+          [-89.79297430041262, 28.850584616352855],
+          [-88.91681463244387, 28.850584616352855],
+          [-88.91681463244387, 29.677212347812258]]], null, false);
+var rgbVis = {"opacity":1,"bands":["B4","B3","B2"],"min":1,"max":1506,"gamma":1.786};
+//********************************* Image Collection*****************************************//
+Map.centerObject(geometry,10)
 
-//Add an image collection
-var collection=ee.ImageCollection('LANDSAT/LT05/C01/T1_SR')
+//Let's constrain the Sentinel-2 SR collection by our geometry & a cloudy pixel percentage metadata
+var collection = s2
+.filter(ee.Filter.bounds(geometry))
+.filter(ee.Filter.date('2020-01-01', '2021-01-01'))
+.filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE',5))
+.select('B.*') //Also let us only add optical bands wildcard to filter only bands starting with B
 
-//Filtering an Image Collection
-var filtered=collection.filterMetadata('WRS_PATH','equals',25)
-.filterMetadata('WRS_ROW','equals',39).filterMetadata('CLOUD_COVER','less_than',15)
+print('Total filtered images in collection',collection.size())
 
-//print filtered collection properties
-print("Filtered Collection",filtered)
+/*
+Things to keep in mind, image collections are usually sorted by default based on date
+Mosaic function adds the latest pixels or most recent image on top while trying to mosaic
+*/
 
-//Create Multi Year Composite from Landsat 5 Surface Reflectance
-var years = ee.List.sequence(1984, 2010)
+var mosaic = collection.mosaic()
 
-var multiyear = ee.ImageCollection(years
-  .map(function(y) {
-    var start = ee.Date.fromYMD(y, 1, 1)
-    var end = start.advance(1, 'year');
-    var image = filtered.filterDate(start, end).median();
-    return image.set('year', y)
-}))
+Map.addLayer(collection, rgbVis, 'Filtered Collection');
+Map.addLayer(mosaic.clip(geometry), rgbVis, 'Mosaic',false);
 
-print(multiyear);
+//Using the visualize function means you have forced the image to be visualized in a specific way
+var visualized = mosaic.clip(geometry).visualize(rgbVis)
 
-//Add a visualization
-var vis = {"opacity":1,"bands":["B4","B3","B2"],"min":-95.56918120427508,"max":2171.008347369839,"gamma":1};
-
-//Add the Image
-Map.addLayer(ee.Image(ee.ImageCollection(multiyear).first()),vis,"Median from MultiYear")
-
-//Export Imagery
+//You can export the visualized image so that you get something that looks similar to how it would appear in GEE
 Export.image.toDrive({
-  image:ee.Image(ee.ImageCollection(multiyear).first())
-  .select(['B1','B2','B3','B4','B5','B6','B7']).toUint16(),
-  description: "Median-Image-Export",
-  folder: 'EE-CSDMS-Test',
-  scale:30,
-  region: geometry,
-  maxPixels:10e12
+    image: visualized.clip(geometry),
+    description: 'Export-Median-Composite-Visualized',
+    folder: 'csdms2021',
+    fileNamePrefix: 'median_composite_visualized',
+    region: geometry,
+    scale: 20,
+    maxPixels: 1e12
 })
-```
 
-Exporting video seems like the obvious thing to do after this. For this a couple of things to keep in mind, you can only export 3 band videos cast to a 8 bit image per frame. You can sort these images before export and that is the ordering of the frames.
-
-``` js
-// Load and format the collection to export.
-var frame = ee.ImageCollection(multiyear)
-  .sort('year')
-  .select(['B4', 'B3', 'B2'])
-  .map(function(image) {
-    return image.visualize({bands: ['B4', 'B3', 'B2'], min: -100, max:2200})
-    .set('year',image.get('year'));
-  });
-
-// Export video
-Export.video.toDrive({
-  collection: frame,
-  folder: 'EE-CSDMS-Test',
-  description: 'EE-CSDMS-Video',
-  dimensions: 1080,
-  framesPerSecond: 1,
-  region: geometry
-});
+//Or you can export the image only
+Export.image.toDrive({
+    image: mosaic.clip(geometry),
+    description: 'Export-Median-Composite',
+    folder: 'csdms2021',
+    fileNamePrefix: 'median_composite',
+    region: geometry,
+    scale: 20,
+    maxPixels: 1e12
+})
 ```

@@ -1,6 +1,8 @@
 # Feature Collections in Earth Engine
 
-Feature Collections are similar to Image Collections - but they contain Features, not images. They are equivalent to Vector Layers in a GIS. We can load, filter and display Feature Collections using similar techniques that we have learned so far. Similar to bringing in your own images and creating image collections, it is possible to upload shapefiles and CSV tables directly into earh engine enriching the list of datasets made available to you.
+Feature Collections are similar to Image Collections - but they contain Features, not images. They are equivalent to Vector Layers in a GIS. We can load, filter and display Feature Collections using similar techniques that we have learned so far. Similar to bringing in your own images and creating image collections, it is possible to upload shapefiles and CSV tables directly into earth engine enriching the list of datasets made available to you.
+
+![ee_features](https://user-images.githubusercontent.com/6677629/118320038-47218900-b4c1-11eb-8d20-d1af0110f35b.gif)
 
 For this example we chose to use the Hydrologic Unit Code or HUC boundaries already preingested in Google Earth Engine. I decided to use HUC 6 but you can choose a scale depending on your question of interest.
 

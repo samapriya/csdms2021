@@ -1,11 +1,11 @@
-# Functions & Mapping
+# Collection Maps & Indices
 
-While single image operations are direct and can be applied to the imagery for a one to one result. Applying any kind of analysis on a single image means you have to call the image and run the analysis which is quick and easy. To be able to turn this same into a function that you can iterate over an entire collection requires us to convert a single analysis to a function. A function is then mapped or run over an entire collection. To avoid any errors make sure that the collection images are consistent and have same name and number of band and characteristics.
+Now that we know how to build functions like the cloud mask, what about applying a simple band ratio or an index and adding it back to the image? Mapping over a collection is powerful because it allows you to work efficiently over each image in the collection without needing to aggregate or composite before hand though both approaches can find some use.
 
-![ee_functions](https://user-images.githubusercontent.com/6677629/118319001-c1e9a480-b4bf-11eb-9275-9ee94770d4a1.gif)
+For this example we are going to run a simple Normalized Difference Vegetation Index over our area of interest and add the results back with a visualization palette.
 
+![ee_indices](https://user-images.githubusercontent.com/6677629/118348802-4f55e480-b512-11eb-97fd-f9eafcced252.gif)
 
-For this setup we look at how we could apply cloud masking to Sentinel-2 using the Snow and Cloud Probability bands.
 
 ``` js
 var s2 = ee.ImageCollection("COPERNICUS/S2_SR");
@@ -16,7 +16,6 @@ var geometry =
           [-88.91681463244387, 28.850584616352855],
           [-88.91681463244387, 29.677212347812258]]], null, false);
 var rgbVis = {"opacity":1,"bands":["B4","B3","B2"],"min":1,"max":1506,"gamma":1.786};
-
 //********************************* Image Collection*****************************************//
 Map.centerObject(geometry,10)
 
@@ -26,10 +25,10 @@ var collection = s2
 .filter(ee.Filter.date('2020-01-01', '2021-01-01'))
 .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE',5))
 
-print('Total filter images in collection',collection.size())
+print('Total filtered images in collection',collection.size())
 
 
-//Introducing functions & Mapping over functions
+//Add all functions in one place
 
 // Function to remove cloud and snow pixels from Sentinel-2 SR image
 function masks2(image) {
@@ -40,12 +39,26 @@ function masks2(image) {
   var scl = image.select('SCL');
   var shadow = scl.eq(3); // 3 = cloud shadow
   var cirrus = scl.eq(10); // 10 = cirrus
-  // Cloud probability less than 1% or cloud shadow classification
+  // Cloud probability less than 5% or cloud shadow classification
   var mask = (cloud.and(snow)).and(cirrus.neq(1)).and(shadow.neq(1));
   return image.updateMask(mask);
 }
 
-collection = collection.map(masks2)
+// Write a function that computes NDVI for an image and adds it as a band
+function addNDVI(image) {
+  var ndvi = image.normalizedDifference(['B8', 'B4']).rename('ndvi');
+  return image.addBands(ndvi);
+}
+
+var palette = [
+  'FFFFFF', 'CE7E45', 'DF923D', 'F1B555', 'FCD163', '99B718',
+  '74A901', '66A000', '529400', '3E8601', '207401', '056201',
+  '004C00', '023B01', '012E01', '011D01', '011301'];
+
+var ndviVis = {min:0, max:0.5, palette: palette }
+
+collection = collection.map(masks2).map(addNDVI)
+print('Single Image post NDVI',collection.first())
 
 /*
 Things to keep in mind, image collections are usually sorted by default based on date
@@ -53,10 +66,6 @@ Mosaic function adds the latest pixels or most recent image on top while trying 
 Median composite on the other hands takes the median value of pixel over the time period
 */
 
-var mosaic = collection.mosaic()
 var medianComposite = collection.median();
-
-Map.addLayer(collection, rgbVis, 'Filtered Collection');
-Map.addLayer(mosaic.clip(geometry), rgbVis, 'Mosaic',false);
-Map.addLayer(medianComposite.clip(geometry), rgbVis, 'Median Composite',false)
+Map.addLayer(ee.ImageCollection(collection).median().select("ndvi").clip(geometry),ndviVis,'NDVI Median')
 ```

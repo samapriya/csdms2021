@@ -103,8 +103,10 @@ nav:
     - Feature Collection: projects/feature_collection.md
   - Getting Started with GEE:
     - Mosaics and composites: projects/mosaics_composite.md
-    - Functions in Earth Engine: projects/functions.md
-    - Reducers and Charts: projects/reducers.md
-    - Edge Detection: projects/edges.md
+    - Functions & Mapping: projects/functions.md
+    - Collection Maps & Indices: projects/indices.md
+    - Exporting Image & Visualization: projects/export.md
+  - Community Catalogs & Data Share:
+    - Community Datasets: projects/community.md
   - Citations: citations.md
   - Contact Us: contact.md
